@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 #####################################################
 ## Python module to control the PiGlow by Pimoroni ##
 ##                                                 ##
@@ -75,59 +78,45 @@ class PiGlow:
             0x54, 0x01, [v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v])
         self.bus.write_byte_data(0x54, 0x16, 0xFF)
 
-    def arm(self, arm, value):
+    def update_leds (self, values):
+        self.bus.write_i2c (CMD_SET_PWM_VALUES, values)
+        self.bus.write_i2c (CMD_UPDATE, 0xFF)
+
+    def arm(self, arm, values):
         if arm == 1:
-            self.bus.write_byte_data(0x54, 0x07, value)
-            self.bus.write_byte_data(0x54, 0x08, value)
-            self.bus.write_byte_data(0x54, 0x09, value)
-            self.bus.write_byte_data(0x54, 0x06, value)
-            self.bus.write_byte_data(0x54, 0x05, value)
-            self.bus.write_byte_data(0x54, 0x0A, value)
-            self.bus.write_byte_data(0x54, 0x16, 0xFF)
+            self.arm1(values)
         elif arm == 2:
-            self.bus.write_byte_data(0x54, 0x0B, value)
-            self.bus.write_byte_data(0x54, 0x0C, value)
-            self.bus.write_byte_data(0x54, 0x0E, value)
-            self.bus.write_byte_data(0x54, 0x10, value)
-            self.bus.write_byte_data(0x54, 0x11, value)
-            self.bus.write_byte_data(0x54, 0x12, value)
-            self.bus.write_byte_data(0x54, 0x16, 0xFF)
+            self.arm2(values)
         elif arm == 3:
-            self.bus.write_byte_data(0x54, 0x01, value)
-            self.bus.write_byte_data(0x54, 0x02, value)
-            self.bus.write_byte_data(0x54, 0x03, value)
-            self.bus.write_byte_data(0x54, 0x04, value)
-            self.bus.write_byte_data(0x54, 0x0F, value)
-            self.bus.write_byte_data(0x54, 0x0D, value)
-            self.bus.write_byte_data(0x54, 0x16, 0xFF)
+            self.arm3(values)
         else:
             print "Unknown number, expected only 1, 2 or 3"
 
-    def arm1(self, value):
-        self.bus.write_byte_data(0x54, 0x07, value)
-        self.bus.write_byte_data(0x54, 0x08, value)
-        self.bus.write_byte_data(0x54, 0x09, value)
-        self.bus.write_byte_data(0x54, 0x06, value)
-        self.bus.write_byte_data(0x54, 0x05, value)
-        self.bus.write_byte_data(0x54, 0x0A, value)
+    def arm1(self, values):
+        self.bus.write_byte_data(0x54, 0x0A, values[0])
+        self.bus.write_byte_data(0x54, 0x05, values[1])
+        self.bus.write_byte_data(0x54, 0x06, values[2])
+        self.bus.write_byte_data(0x54, 0x09, values[3])
+        self.bus.write_byte_data(0x54, 0x08, values[4])
+        self.bus.write_byte_data(0x54, 0x07, values[5])
         self.bus.write_byte_data(0x54, 0x16, 0xFF)
 
-    def arm2(self, value):
-        self.bus.write_byte_data(0x54, 0x0B, value)
-        self.bus.write_byte_data(0x54, 0x0C, value)
-        self.bus.write_byte_data(0x54, 0x0E, value)
-        self.bus.write_byte_data(0x54, 0x10, value)
-        self.bus.write_byte_data(0x54, 0x11, value)
-        self.bus.write_byte_data(0x54, 0x12, value)
+    def arm2(self, values):
+        self.bus.write_byte_data(0x54, 0x0B, values[0])
+        self.bus.write_byte_data(0x54, 0x0C, values[1])
+        self.bus.write_byte_data(0x54, 0x0E, values[2])
+        self.bus.write_byte_data(0x54, 0x10, values[3])
+        self.bus.write_byte_data(0x54, 0x11, values[4])
+        self.bus.write_byte_data(0x54, 0x12, values[5])
         self.bus.write_byte_data(0x54, 0x16, 0xFF)
 
-    def arm3(self, value):
-        self.bus.write_byte_data(0x54, 0x01, value)
-        self.bus.write_byte_data(0x54, 0x02, value)
-        self.bus.write_byte_data(0x54, 0x03, value)
-        self.bus.write_byte_data(0x54, 0x04, value)
-        self.bus.write_byte_data(0x54, 0x0F, value)
-        self.bus.write_byte_data(0x54, 0x0D, value)
+    def arm3(self, values):
+        self.bus.write_byte_data(0x54, 0x01, values[5])
+        self.bus.write_byte_data(0x54, 0x02, values[4])
+        self.bus.write_byte_data(0x54, 0x03, values[3])
+        self.bus.write_byte_data(0x54, 0x04, values[2])
+        self.bus.write_byte_data(0x54, 0x0F, values[1])
+        self.bus.write_byte_data(0x54, 0x0D, values[0])
         self.bus.write_byte_data(0x54, 0x16, 0xFF)
 
     def colour(self, colour, value):
