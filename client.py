@@ -37,7 +37,8 @@ class PiGlow_Status_Client:
 
     cwd = os.path.dirname (os.path.abspath (inspect.getfile (inspect.currentframe ())))
     server = "%s/server.py" % cwd
-    os.spawnl (os.P_NOWAIT, server, server, "start")
+
+    os.spawnl (os.P_WAIT, server, server)
     sleep (2)
 
 

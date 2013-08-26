@@ -33,7 +33,7 @@ class PiGlow_Status_Server:
     self.clock = None
     self.alert = None
     self.in_progress = None
-    self.job_interval = 0.1
+    self.job_interval = 0.5
 
 
   def main (self):
@@ -259,4 +259,7 @@ if __name__ == "__main__":
   except IndexError:
 
     server_path = os.path.abspath (inspect.getfile (inspect.currentframe ()))
-    os.spawnl (os.P_NOWAIT, server_path, server_path, "start")
+
+    command = "/usr/bin/nice"
+    args = [command, "-n", "10", server_path, "start"]
+    os.spawnv (os.P_NOWAIT, command, args)
