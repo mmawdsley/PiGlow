@@ -9,23 +9,51 @@ from time import sleep
 from datetime import datetime
 from socket import *
 from threading import Thread
+import ConfigParser
+import errno
 import thread
-import time
 import select
 import os
 import sys
 import inspect
-import config as cfg
+
+class PiGlow_Status_Config:
+
+  def __init__ (self):
+
+    self.config_path = "/etc/piglow_status.conf"
+
+    config = ConfigParser.ConfigParser ()
+    config.read (self.config_path)
+
+    self.TIMEOUT = config.getint ("main", "timeout")
+    self.BUFF = config.getint ("main", "buff")
+    self.HOST = config.get ("main", "host")
+    self.PORT = config.getint ("main", "port")
+
+
+class PiGlow_Status_Commands:
+
+  def __init__ (self):
+
+    self.ALERT = "alert"
+    self.CLOCK = "clock"
+    self.CLOSE = "close"
+    self.CYCLE = "cycle"
+    self.OFF = "off"
+    self.QUIT = "quit"
+    self.UNLOCK = "unlock"
+
 
 class PiGlow_Status_Server:
 
   def __init__ (self):
 
-    self.cfg = cfg
-    self.idle_job = self.cfg.CMD_CLOCK
+    self.cfg = PiGlow_Status_Config ()
+    self.commands = PiGlow_Status_Commands ()
+    self.idle_job = self.commands.CLOCK
     self.jobs = []
     self.running = None
-    self.quit = False
     self.locked_thread = None
     self.check_jobs_thread = None
     self.socket_manager_thread = None
@@ -36,10 +64,21 @@ class PiGlow_Status_Server:
     self.job_interval = 0.5
 
 
-  def main (self):
+  def start (self):
     """Creates the socket and starts the threads"""
 
-    self.piglow = PiGlow ()
+    try:
+      self.piglow = PiGlow ()
+
+    except IOError as e:
+
+      if e[0] == errno.EACCES:
+        print >> sys.stderr, "Permission denied, try running as root"
+      else:
+        print >> sys.stderr, "Unknown error accessing the PiGlow"
+
+      sys.exit (1)
+
     self.piglow.all (0)
 
     self.clock = Clock (self.piglow)
@@ -58,13 +97,13 @@ class PiGlow_Status_Server:
 
     self.start_threads ()
 
-    while self.quit == False:
+    while self.running == True:
       sleep (1)
 
-    self.exit ()
+    self.stop ()
 
 
-  def exit (self):
+  def stop (self):
     """Closes the threads and returns"""
 
     self.stop_threads ()
@@ -96,7 +135,7 @@ class PiGlow_Status_Server:
     while self.running == True:
 
       if self.quit_requested ():
-        self.quit = True
+        self.running = False
         break
 
 
@@ -110,7 +149,7 @@ class PiGlow_Status_Server:
         # relating to it.
         self.check_locked_jobs ()
 
-      time.sleep (self.job_interval)
+      sleep (self.job_interval)
 
 
   def quit_requested (self):
@@ -118,7 +157,7 @@ class PiGlow_Status_Server:
 
     for job in self.jobs:
 
-      if job[0] == self.cfg.CMD_QUIT:
+      if job[0] == self.commands.QUIT:
         return True
 
     return False
@@ -132,17 +171,17 @@ class PiGlow_Status_Server:
 
     for job in jobs:
 
-      if job[0] == self.cfg.CMD_CYCLE:
+      if job[0] == self.commands.CYCLE:
 
         try:
           self.in_progress.set_speed (job[1])
         except IndexError:
           pass
 
-      elif job[0] == self.cfg.CMD_UNLOCK:
+      elif job[0] == self.commands.UNLOCK:
         self.unlock ()
 
-      elif job[0] == self.cfg.CMD_OFF:
+      elif job[0] == self.commands.OFF:
         self.unlock ()
         self.jobs.append (job)
 
@@ -171,7 +210,7 @@ class PiGlow_Status_Server:
   def run_idle_job (self):
     """Runs the current idle job"""
 
-    if self.idle_job == self.cfg.CMD_CLOCK:
+    if self.idle_job == self.commands.CLOCK:
       self.clock.run ()
 
 
@@ -181,11 +220,11 @@ class PiGlow_Status_Server:
     command = job[:1].pop ()
     args = job[1:]
 
-    if command == self.cfg.CMD_QUIT:
+    if command == self.commands.QUIT:
 
-      self.quit = True
+      self.running = False
 
-    elif command == self.cfg.CMD_CYCLE:
+    elif command == self.commands.CYCLE:
 
       self.locked_thread = self.in_progress
 
@@ -194,17 +233,17 @@ class PiGlow_Status_Server:
 
       self.in_progress.start ()
 
-    elif command == self.cfg.CMD_ALERT:
+    elif command == self.commands.ALERT:
 
       self.alert.show (*args)
 
-    elif command == self.cfg.CMD_OFF:
+    elif command == self.commands.OFF:
 
       self.idle_job = None
 
-    elif command == self.cfg.CMD_CLOCK:
+    elif command == self.commands.CLOCK:
 
-      self.idle_job = self.cfg.CMD_CLOCK
+      self.idle_job = self.commands.CLOCK
 
 
   def unlock (self):
@@ -241,25 +280,95 @@ class PiGlow_Status_Server:
     data = clientsock.recv (self.cfg.BUFF).rstrip ()
     command = data.split (" ")
 
-    if command == self.cfg.CMD_CLOSE:
+    if command == self.commands.CLOSE:
       clientsock.close ()
     else:
       self.jobs.append (command)
+
+
+class PiGlow_Status_Client:
+
+  def __init__ (self):
+
+    self.cfg = PiGlow_Status_Config ()
+    self.address = (self.cfg.HOST, self.cfg.PORT)
+
+
+  def main (self, args):
+    """Reads instructions from the command line and passes them along to the server"""
+
+    self.run (" ".join (args))
+
+
+  def run (self, command):
+    """Sends a command to the server"""
+
+    if self.send_command (command) == True:
+      return
+
+    self.spawn_server ()
+    self.send_command (command)
+
+
+  def spawn_server (self):
+    """Attempts to spawn the server as a separate process"""
+
+    cwd = os.path.dirname (os.path.abspath (inspect.getfile (inspect.currentframe ())))
+    server = "%s/server.py" % cwd
+
+    os.spawnl (os.P_WAIT, server, server)
+    sleep (2)
+
+
+  def send_command (self, command):
+    """Sends a command to the server"""
+
+    try:
+
+      sock = socket ()
+      sock.connect (self.address)
+      sock.send (command)
+      sock.close ()
+
+      return True
+
+    except Exception:
+
+      return False
 
 
 if __name__ == "__main__":
 
   try:
 
-    if sys.argv[1] == "start":
+    filename = os.path.basename (sys.argv[0])
 
-      server = PiGlow_Status_Server ()
-      server.main ()
+    if filename == "piglow_status_server":
+
+      try:
+
+        if sys.argv[1] == "start":
+
+          try:
+            server = PiGlow_Status_Server ()
+            server.start ()
+
+          except KeyboardInterrupt:
+            server.stop ()
+
+      except IndexError:
+
+        server_path = os.path.abspath (inspect.getfile (inspect.currentframe ()))
+
+        command = "/usr/bin/nice"
+        args = [command, "-n", "10", server_path, "start"]
+        os.spawnv (os.P_NOWAIT, command, args)
+
+    elif filename == "piglow_status_client":
+
+      client = PiGlow_Status_Client ()
+      client.main (sys.argv[1:])
 
   except IndexError:
 
-    server_path = os.path.abspath (inspect.getfile (inspect.currentframe ()))
-
-    command = "/usr/bin/nice"
-    args = [command, "-n", "10", server_path, "start"]
-    os.spawnv (os.P_NOWAIT, command, args)
+    pass
