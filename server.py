@@ -59,7 +59,7 @@ class PiGlow_Status_Server:
     self.start_threads ()
 
     while self.quit == False:
-      pass
+      sleep (1)
 
     self.exit ()
 

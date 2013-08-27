@@ -83,7 +83,7 @@ if __name__ == "__main__":
     in_progress.start ()
 
     while True:
-      pass
+      sleep (1)
 
   except KeyboardInterrupt:
 
