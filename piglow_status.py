@@ -61,7 +61,7 @@ class PiGlow_Status_Server:
     self.clock = None
     self.alert = None
     self.in_progress = None
-    self.job_interval = 0.5
+    self.job_interval = 0.1
 
 
   def start (self):
@@ -313,10 +313,8 @@ class PiGlow_Status_Client:
   def spawn_server (self):
     """Attempts to spawn the server as a separate process"""
 
-    cwd = os.path.dirname (os.path.abspath (inspect.getfile (inspect.currentframe ())))
-    server = "%s/server.py" % cwd
-
-    os.spawnl (os.P_WAIT, server, server)
+    server_path = "/sbin/piglow_status_server"
+    os.spawnl (os.P_WAIT, server_path, server_path)
     sleep (2)
 
 
@@ -358,7 +356,7 @@ if __name__ == "__main__":
 
       except IndexError:
 
-        server_path = os.path.abspath (inspect.getfile (inspect.currentframe ()))
+        server_path = "/sbin/piglow_status_server"
 
         command = "/usr/bin/nice"
         args = [command, "-n", "10", server_path, "start"]
