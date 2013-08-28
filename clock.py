@@ -7,6 +7,7 @@
 ##  Example by Jason - @Boeeerb     ##
 ######################################
 
+from piglow import PiGlow
 from time import sleep
 from datetime import datetime
 
@@ -19,92 +20,74 @@ class Clock:
     self.ledbrightness = 1
     self.hourflash = 0
 
-    self.armtop = "h"
-    self.armright = "m"
-    self.armbottom = "s"
+    self.hourarm = 1
+    self.minutearm = 2
+    self.secondarm = 3
 
   def run (self):
+    """Sets the LEDs to indicate the current time"""
 
     hourcount = 0
     hourcurrent = 0
 
     time = datetime.now ().time ()
-    hour,min,sec = str (time).split (":")
-    sec,micro = str (sec).split (".")
+    hour, minute, second = str (time).split (":")
+    second, micro = str (second).split (".")
     hour = int (hour)
 
     if self.show12hr == 1:
       if hour > 12:
         hour = hour - 12
 
-    min = int (min)
-    sec = int (sec)
-
-    binhour = "%06d" % int (bin (hour)[2:])
-    binmin = "%06d" % int (bin (min)[2:])
-    binsec = "%06d" % int (bin (sec)[2:])
+    minute = int (minute)
+    second = int (second)
 
     # Check if current hour is different and set ready to flash hour
     if hourcurrent != hour:
       hourcount = hour
       hourcurrent = hour
 
-    if self.armbottom == "h":
-      arm3 = list (binhour)
-    elif self.armbottom == "m":
-      arm3 = list (binmin)
+    self.piglow.arm (self.hourarm, self.get_arm_values (hour))
+    self.piglow.arm (self.minutearm, self.get_arm_values (minute))
+    self.piglow.arm (self.secondarm, self.get_arm_values (second))
+
+    # Flash the white leds for the hour
+    if hourcount != 0:
+      sleep (0.5)
+
+      if self.hourflash == 1:
+        self.piglow.white (self.ledbrightness)
+
+      if self.hourflash == 2:
+        self.piglow.all (self.ledbrightness)
+
+      sleep (0.5)
+      hourcount = hourcount - 1
+
     else:
-      arm3 = list (binsec)
+      sleep (0.1)
 
-    led13 = self.ledbrightness if arm3[5] == "1" else 0
-    self.piglow.led (13,led13)
-    led14 = self.ledbrightness if arm3[4] == "1" else 0
-    self.piglow.led (14,led14)
-    led15 = self.ledbrightness if arm3[3] == "1" else 0
-    self.piglow.led (15,led15)
-    led16 = self.ledbrightness if arm3[2] == "1" else 0
-    self.piglow.led (16,led16)
-    led17 = self.ledbrightness if arm3[1] == "1" else 0
-    self.piglow.led (17,led17)
-    led18 = self.ledbrightness if arm3[0] == "1" else 0
-    self.piglow.led (18,led18)
 
-    if self.armright == "h":
-      arm2 = list (binhour)
-    elif self.armright == "m":
-      arm2 = list (binmin)
-    else:
-      arm2 = list (binsec)
+  def get_arm_values (self, number):
+    """Returns the list of values for an arm in binary from a base-10 number"""
 
-    led07 = self.ledbrightness if arm2[5] == "1" else 0
-    self.piglow.led (7,led07)
-    led08 = self.ledbrightness if arm2[4] == "1" else 0
-    self.piglow.led (8,led08)
-    led09 = self.ledbrightness if arm2[3] == "1" else 0
-    self.piglow.led (9,led09)
-    led10 = self.ledbrightness if arm2[2] == "1" else 0
-    self.piglow.led (10,led10)
-    led11 = self.ledbrightness if arm2[1] == "1" else 0
-    self.piglow.led (11,led11)
-    led12 = self.ledbrightness if arm2[0] == "1" else 0
-    self.piglow.led (12,led12)
+    binnumber = "%06d" % int (bin (number)[2:])
+    values = []
 
-    if self.armtop == "h":
-      arm1 = list (binhour)
-    elif self.armtop == "m":
-      arm1 = list (binmin)
-    else:
-      arm1 = list (binsec)
+    for i in range (0, 6):
+      values.append (self.ledbrightness if binnumber[i] == "1" else 0)
 
-    led01 = self.ledbrightness if arm1[5] == "1" else 0
-    self.piglow.led (1,led01)
-    led02 = self.ledbrightness if arm1[4] == "1" else 0
-    self.piglow.led (2,led02)
-    led03 = self.ledbrightness if arm1[3] == "1" else 0
-    self.piglow.led (3,led03)
-    led04 = self.ledbrightness if arm1[2] == "1" else 0
-    self.piglow.led (4,led04)
-    led05 = self.ledbrightness if arm1[1] == "1" else 0
-    self.piglow.led (5,led05)
-    led06 = self.ledbrightness if arm1[0] == "1" else 0
-    self.piglow.led (6,led06)
+    return values
+
+
+if __name__ == "__main__":
+
+  piglow = PiGlow ()
+  clock = Clock (piglow)
+
+  try:
+    while True:
+      clock.run ()
+      sleep (0.1)
+  except KeyboardInterrupt:
+    piglow.all (0)
