@@ -6,9 +6,9 @@ from alert import Alert
 from inprogress import In_Progress
 from piglow import PiGlow
 from time import sleep
-from datetime import datetime
 from socket import *
 from threading import Thread
+import datetime
 import ConfigParser
 import errno
 import thread
@@ -30,6 +30,50 @@ class PiGlow_Status_Config:
     self.BUFF = config.getint ("main", "buff")
     self.HOST = config.get ("main", "host")
     self.PORT = config.getint ("main", "port")
+
+    self.quiet_start_hour = None
+    self.quiet_start_minute = None
+    self.quiet_end_hour = None
+    self.quiet_end_minute = None
+
+    try:
+      self.quiet_start_hour, self.quiet_start_minute = self.parse_time (config.get ("quiet", "start"))
+      self.quiet_end_hour, self.quiet_end_minute = self.parse_time (config.get ("quiet", "end"))
+    except ConfigParser.Error:
+      pass
+
+
+
+  def parse_time (self, time):
+    """Parses a time string and returns the hour and minute"""
+
+    hour, minute = time.split (":")
+
+    try:
+      hour = int (hour)
+      minute = int (minute)
+
+      return hour, minute
+
+    except ValueError:
+      pass
+
+
+  def quiet_time (self):
+    """Returns true if we're in quiet time"""
+
+    if self.quiet_start_hour is None or self.quiet_start_minute is None \
+          or self.quiet_end_hour is None or self.quiet_end_minute is None:
+      return False
+
+    now = datetime.datetime.now ()
+    quiet_start = datetime.datetime (now.year, now.month, now.day, self.quiet_start_hour, self.quiet_start_minute)
+    quiet_end = datetime.datetime (now.year, now.month, now.day, self.quiet_end_hour, self.quiet_end_minute)
+
+    if quiet_start > quiet_end:
+      quiet_end = quiet_end + datetime.timedelta (1)
+
+    return now >= quiet_start and now <= quiet_end
 
 
 class PiGlow_Status_Commands:
@@ -62,6 +106,7 @@ class PiGlow_Status_Server:
     self.alert = None
     self.in_progress = None
     self.job_interval = 0.1
+    self.quiet_time = False
 
 
   def start (self):
@@ -134,20 +179,25 @@ class PiGlow_Status_Server:
 
     while self.running == True:
 
-      if self.quit_requested ():
-        self.running = False
-        break
+      if self.entering_quiet_time () == True:
+        self.unlock ()
+        self.piglow.all (0)
 
+      if self.in_quiet_time () == False:
 
-      if self.locked_thread is None:
-        # No currently locking jobs, we can process the next job in the list as
-        # normal or run the idle task if none are scheduled
-        self.run_jobs ()
+        if self.quit_requested ():
+          self.running = False
+          break
 
-      else:
-        # A locking job is currently running, screen the job list for tasks
-        # relating to it.
-        self.check_locked_jobs ()
+        if self.locked_thread is None:
+          # No currently locking jobs, we can process the next job in the list as
+          # normal or run the idle task if none are scheduled
+          self.run_jobs ()
+
+        else:
+          # A locking job is currently running, screen the job list for tasks
+          # relating to it.
+          self.check_locked_jobs ()
 
       sleep (self.job_interval)
 
@@ -282,8 +332,22 @@ class PiGlow_Status_Server:
 
     if command == self.commands.CLOSE:
       clientsock.close ()
-    else:
+    elif self.cfg.quiet_time () == False:
       self.jobs.append (command)
+
+
+  def entering_quiet_time (self):
+    """Returns true if we're entering quiet time"""
+
+    return self.quiet_time == False and self.cfg.quiet_time () == True
+
+
+  def in_quiet_time (self):
+    """Returns true if we're in quiet time"""
+
+    self.quiet_time = self.cfg.quiet_time ()
+
+    return self.quiet_time
 
 
 class PiGlow_Status_Client:
