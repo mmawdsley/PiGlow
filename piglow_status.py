@@ -76,9 +76,10 @@ class PiGlow_Status_Config:
 
       if now >= quiet_start and now <= quiet_end + oneday:
         return True
-
-      if now >= quiet_start - oneday and now <= quiet_end:
+      elif now >= quiet_start - oneday and now <= quiet_end:
         return True
+      else:
+        return False
 
     else:
       return now >= quiet_start and now <= quiet_end
@@ -178,8 +179,15 @@ class PiGlow_Status_Server:
     self.running = False
     self.unlock ()
 
-    self.check_jobs_thread.join ()
-    self.socket_manager_thread.join ()
+    try:
+      self.check_jobs_thread.join ()
+    except (KeyboardInterrupt, SystemExit):
+      pass
+
+    try:
+      self.socket_manager_thread.join ()
+    except (KeyboardInterrupt, SystemExit):
+      pass
 
 
   def check_jobs (self):
@@ -187,15 +195,15 @@ class PiGlow_Status_Server:
 
     while self.running == True:
 
+      if self.quit_requested ():
+        self.running = False
+        break
+
       if self.entering_quiet_time () == True:
         self.unlock ()
         self.piglow.all (0)
 
       if self.in_quiet_time () == False:
-
-        if self.quit_requested ():
-          self.running = False
-          break
 
         if self.locked_thread is None:
           # No currently locking jobs, we can process the next job in the list as
@@ -329,7 +337,7 @@ class PiGlow_Status_Server:
 
         if s is serversock:
           clientsock, addr = serversock.accept ()
-          thread.start_new_thread (self.socket_buffer_handler, (clientsock, ))
+          self.socket_buffer_handler (clientsock)
 
 
   def socket_buffer_handler (self, clientsock):
@@ -340,7 +348,14 @@ class PiGlow_Status_Server:
 
     if command == self.commands.CLOSE:
       clientsock.close ()
-    elif self.cfg.quiet_time () == False:
+    else:
+      self.add_job (command)
+
+
+  def add_job (self, job):
+    """Adds a job to the list"""
+
+    if self.cfg.quiet_time () == False or job == self.command.QUIT:
       self.jobs.append (command)
 
 
