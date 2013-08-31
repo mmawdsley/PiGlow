@@ -71,9 +71,17 @@ class PiGlow_Status_Config:
     quiet_end = datetime.datetime (now.year, now.month, now.day, self.quiet_end_hour, self.quiet_end_minute)
 
     if quiet_start > quiet_end:
-      quiet_end = quiet_end + datetime.timedelta (1)
 
-    return now >= quiet_start and now <= quiet_end
+      oneday = datetime.timedelta (1)
+
+      if now >= quiet_start and now <= quiet_end + oneday:
+        return True
+
+      if now >= quiet_start - oneday and now <= quiet_end:
+        return True
+
+    else:
+      return now >= quiet_start and now <= quiet_end
 
 
 class PiGlow_Status_Commands:
