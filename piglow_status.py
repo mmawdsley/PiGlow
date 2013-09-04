@@ -356,7 +356,7 @@ class PiGlow_Status_Server:
     """Adds a job to the list"""
 
     if self.cfg.quiet_time () == False or job == self.command.QUIT:
-      self.jobs.append (command)
+      self.jobs.append (job)
 
 
   def entering_quiet_time (self):
